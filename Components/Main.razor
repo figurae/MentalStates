@@ -1,0 +1,107 @@
+@inject Blazored.LocalStorage.ILocalStorageService localStore
+@implements IDisposable
+
+<div>
+    <MentalStates.Components.ItemManager />
+    @for (int i = 0; i < storeItems.Count; i++)
+    {
+        if (storeItems[i] != null)
+        {
+            <MentalStates.Components.ItemSlider
+            ItemId="@storeItems[i].ItemId"
+            Title="@storeItems[i].Title.ToString()"
+            SliderValue="@storeItems[i].Value"
+            OnSliderValueChanged="SliderValueChanged"
+            OnRemoveItemClicked="RemoveItemClicked"
+            OnUpdateItemClicked="UpdateItemClicked" />
+        }
+    }
+</div>
+
+@code
+{
+    private int storeLength;
+    private List<Item> storeItems = new List<Item>();
+    private Item currentItem;
+
+    public static event EventHandler<int> RemovedItem;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // event/state manager to handle all types of events?
+        ItemManager.ItemAdded += ItemManagerOnItemAdded;
+        ItemManager.RemovedAllItems += ItemManagerOnRemovedAllItems;
+
+        await LoadStoreItems();
+    }
+
+    private async Task LoadStoreItems()
+    {
+        storeItems.Clear();
+        storeLength = await localStore.LengthAsync();
+
+        for (int i = 0; i < storeLength; i++)
+        {
+            storeItems.Add(await GetItem(i));
+        }
+    }
+
+    private void ItemManagerOnItemAdded(object sender, ItemAddedEventArgs<Item> args)
+    {
+        storeItems.Add(args.Item.Clone());
+
+        StateHasChanged();
+    }
+
+    private void ItemManagerOnRemovedAllItems()
+    {
+        storeItems.Clear();
+
+        StateHasChanged();
+    }
+
+    // should I do anything with this?
+    public void Dispose()
+    {
+        System.Console.WriteLine("Inside Dispose()");
+        ItemManager.ItemAdded -= ItemManagerOnItemAdded;
+        ItemManager.RemovedAllItems -= ItemManagerOnRemovedAllItems;
+    }
+
+
+    private async Task<Item> GetItem(int itemId)
+    {
+        return await localStore.GetItemAsync<Item>(itemId.ToString());
+    }
+
+    private async void SliderValueChanged(SliderEventCallbackArgs args)
+    {
+        currentItem = await GetItem(args.ItemId);
+
+        currentItem.Value = storeItems[args.ItemId].Value = args.Value;
+
+        StateHasChanged();
+
+        await localStore.SetItemAsync<Item>(currentItem.ItemId.ToString(), currentItem);
+    }
+
+    public async void RemoveItemClicked(int itemId)
+    {
+        // see Extensions/Events.cs. this shit convoluted but can't await otherwise?
+        // this invocation MUST be finished before attempting to reload storeItems.
+        await RemovedItem?.InvokeAsync(this, itemId);
+
+        await LoadStoreItems();
+
+        StateHasChanged();
+    }
+
+    private async void UpdateItemClicked(UpdateEventCallbackArgs args)
+    {
+        storeItems[args.ItemId].Title = args.Title;
+
+        await localStore.SetItemAsync<Item>(args.ItemId.ToString(), storeItems[args.ItemId]);
+
+        StateHasChanged();
+    }
+}

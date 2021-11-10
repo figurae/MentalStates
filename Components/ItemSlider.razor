@@ -1,0 +1,190 @@
+<style>
+[id="@ItemId"]::-moz-range-track {
+    height: 8.4px;
+    border-radius: 2.5px;
+    background: rgb(@sliderBackground.Red, @sliderBackground.Green, @sliderBackground.Blue);
+}
+</style>
+
+<p>
+    <input
+        type="range"
+        id="@ItemId"
+        min="@sliderMin"
+        max="@sliderMax"
+        step="@sliderStep"
+        @bind="@sliderValue"
+        @oninput="@((args) => SliderOnInput(Convert.ToSingle(args.Value)))"
+    />
+
+    @sliderValue.ToString("00.0")
+
+    <button
+        class="btn btn-primary"
+        @onmousedown="() => HoldButton(Direction.Right)"
+        @onmouseup="LetGoButton"
+        @onmouseout="LetGoButton">
+            Add
+    </button>
+    <button
+        class="btn btn-primary"
+        @onmousedown="() => HoldButton(Direction.Left)"
+        @onmouseup="LetGoButton"
+        @onmouseout="LetGoButton">
+            Subtract
+    </button>
+
+    @if (editMode)
+    {
+        <input
+            type="text"
+            placeholder="Title"
+            @bind="Title" />
+
+        <button
+            class="btn btn-primary"
+            @onclick="() => UpdateItem(new UpdateEventCallbackArgs(ItemId, Title))">
+                Save
+        </button>
+        <button
+            class="btn btn-primary"
+            @onclick="() => CancelEditItem()">
+                Cancel
+        </button>
+    } else
+    {
+        @Title
+
+        <button
+            class="btn btn-primary"
+            @onclick="() => EditItem(ItemId)">
+                Edit
+        </button>
+    }
+
+    <button
+        class="btn btn-danger"
+        @onclick="() => RemoveItem(ItemId)">
+            Remove
+    </button>
+</p>
+
+@code {
+    [Parameter]
+    public string   Title { get; set; }
+    [Parameter]
+    public int      ItemId { get; set; }
+    [Parameter]
+    public float    SliderValue { get; set; }
+    [Parameter]
+    public EventCallback<SliderEventCallbackArgs>   OnSliderValueChanged { get; set; }
+    [Parameter]
+    public EventCallback<UpdateEventCallbackArgs>   OnUpdateItemClicked { get; set; }
+    [Parameter]
+    public EventCallback<int>                       OnRemoveItemClicked { get; set; }
+
+    private float   sliderMin = 0.0f,
+                    sliderMax = 10.0f,
+                    sliderStep = 0.1f;
+    private float   sliderValue
+                    {
+                        get => SliderValue;
+                        set
+                        {
+                            SliderValue = value;
+                            SliderEventCallbackArgs args = new SliderEventCallbackArgs(ItemId, value);
+                            OnSliderValueChanged.InvokeAsync(args);
+                        }
+                    }
+
+    private Colour  firstColour = Colour.GreenYellow,
+                    middleColour = Colour.Gold,
+                    lastColour = Colour.Crimson,
+                    sliderBackground = Colour.GreenYellow;
+
+    private bool    isButtonHeld = false;
+    private bool    editMode = false;
+    private string  oldTitle;
+
+    private enum Direction
+    {
+        Right,
+        Left
+    }
+
+    private Direction currentDirection;
+
+    protected override void OnParametersSet()
+    {
+        LerpSliderBackground(SliderValue);
+    }
+
+    private void ModifySlider(Direction dir)
+    {
+        SliderValue += (dir == Direction.Right) ? 0.1f : -0.1f;
+        SliderValue = Math.Clamp(SliderValue, 0.0f, 10.0f);
+        LerpSliderBackground(SliderValue);
+    }
+
+    private async Task HoldButton(Direction dir)
+    {
+        isButtonHeld = true;
+        currentDirection = dir;
+        int speed = 64;
+        while (isButtonHeld)
+        {
+            if (speed.CheckPowerOfTwo())
+            {
+                ModifySlider(currentDirection);
+                StateHasChanged();
+            }
+            await Task.Delay(20);
+            speed -= (speed == 2) ? 0 : 1;
+        }
+    }
+
+    private void LetGoButton()
+    {
+        isButtonHeld = false;
+        // EventCallback takes place only after the button is let go
+        sliderValue = MathF.Round(SliderValue, 1);
+    }
+
+    private void LerpSliderBackground(float value)
+    {
+        sliderBackground = firstColour.Lerp(value.Normalize(sliderMin, sliderMax), middleColour, lastColour);
+    }
+
+    private void SliderOnInput(float value)
+    {
+        SliderValue = value;
+        LerpSliderBackground(value);
+    }
+
+    private void EditItem(int itemId)
+    {
+        editMode = true;
+
+        oldTitle = Title;
+    }
+
+    private async void RemoveItem(int itemId)
+    {
+        await OnRemoveItemClicked.InvokeAsync(itemId);
+    }
+
+    private async void UpdateItem(UpdateEventCallbackArgs args)
+    {
+        await OnUpdateItemClicked.InvokeAsync(args);
+
+        editMode = false;
+    }
+
+    private void CancelEditItem()
+    {
+        editMode = false;
+
+        Title = oldTitle;
+    }
+
+}

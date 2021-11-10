@@ -1,0 +1,126 @@
+@inject Blazored.LocalStorage.ILocalStorageService localStore
+@implements IDisposable
+
+<p>
+    <select
+        class="selectpicker"
+        @bind="currentItem.Type">
+            <option value="@Item.ItemType.Note">Note</option>
+            <option value="@Item.ItemType.Slider">Slider</option>
+    </select>
+    
+    <input
+        type="text"
+        placeholder="Title"
+        @bind="currentItem.Title" />
+    <input
+        type="text"
+        placeholder="Description"
+        @bind="currentItem.Description" />
+
+    <button
+        class="btn btn-primary"
+        @onclick="AddItem">
+            Add
+    </button>
+    <button
+        class="btn btn-primary"
+        @onclick="RemoveAllItems">
+            Clear
+    </button>
+</p>
+
+@code {
+    private int currentItemId;
+    private Item currentItem;
+
+    public static event Action RemovedAllItems;
+    // Action<> perhaps instead of EventHandler? (I don't think so)
+    public static event EventHandler<ItemAddedEventArgs<Item>> ItemAdded;
+    public ItemAddedEventArgs<Item> ItemAddedEventArgs;
+
+    protected override async Task OnInitializedAsync()
+    {
+        InitializeCurrentItem();
+        Main.RemovedItem += MainOnRemovedItem;
+        currentItemId = await localStore.LengthAsync();
+    }
+    private async void AddItem()
+    {
+        for (int i = 0; i < await localStore.LengthAsync(); i++)
+        {
+            // TODO: error handling
+            if (currentItem.Title == (await GetItem(i)).Title) return;
+        }
+
+        currentItem.ItemId = currentItemId;
+        currentItem.Created = currentItem.Updated = DateTime.Now;
+
+        await localStore.SetItemAsync<Item>(currentItemId.ToString(), currentItem);
+
+        ItemAddedEventArgs = new ItemAddedEventArgs<Item>(currentItem);
+        ItemAdded?.Invoke(this, ItemAddedEventArgs);
+
+        currentItemId++;
+        InitializeCurrentItem();
+
+        StateHasChanged();
+    }
+
+    private async void RemoveAllItems()
+    {
+        await localStore.ClearAsync();
+
+        currentItemId = 0;
+
+        RemovedAllItems?.Invoke();
+    }
+
+    public async void MainOnRemovedItem(object sender, int itemId)
+    {
+        await localStore.RemoveItemAsync(itemId.ToString());
+        int storeLength = await localStore.LengthAsync();
+
+        // slow spergy reordering is slow
+        if (itemId < storeLength)
+        {
+            for (int i = itemId; i < storeLength; i++)
+            {
+                currentItem = await localStore.GetItemAsync<Item>((i + 1).ToString());
+                currentItem.ItemId = i;
+                await localStore.SetItemAsync<Item>(i.ToString(), currentItem);
+            }
+            await localStore.RemoveItemAsync((storeLength).ToString());
+        }
+
+        currentItemId = storeLength;
+        InitializeCurrentItem();
+
+        StateHasChanged();
+    }
+
+    private async Task<Item> GetItem(int itemId)
+    {
+        return await localStore.GetItemAsync<Item>(itemId.ToString());
+    }
+
+    private void InitializeCurrentItem()
+    {
+        currentItem = new Item
+                    {
+                        ItemId = -1,
+                        Title = "",
+                        Description = "",
+                        Value = 0.0f,
+                        Notes = "",
+                        Type = 0,
+                        Created = DateTime.UnixEpoch,
+                        Updated = DateTime.UnixEpoch
+                    };
+    }
+
+    public void Dispose()
+    {
+        Main.RemovedItem -= MainOnRemovedItem;
+    }
+}
