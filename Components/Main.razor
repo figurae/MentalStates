@@ -3,14 +3,14 @@
 
 <div>
     <MentalStates.Components.ItemManager />
-    @for (int i = 0; i < storeItems.Count; i++)
+    @for (int i = 0; i < _storeItems.Count; i++)
     {
-        if (storeItems[i] != null)
+        if (_storeItems[i] != null)
         {
             <MentalStates.Components.ItemSlider
-            ItemId="@storeItems[i].ItemId"
-            Title="@storeItems[i].Title.ToString()"
-            SliderValue="@storeItems[i].Value"
+            ItemId="@_storeItems[i].ItemId"
+            Title="@_storeItems[i].Title.ToString()"
+            SliderValue="@_storeItems[i].Value"
             OnSliderValueChanged="SliderValueChanged"
             OnRemoveItemClicked="RemoveItemClicked"
             OnUpdateItemClicked="UpdateItemClicked" />
@@ -20,9 +20,9 @@
 
 @code
 {
-    private int storeLength;
-    private List<Item> storeItems = new List<Item>();
-    private Item currentItem;
+    private int _storeLength;
+    private List<Item> _storeItems = new List<Item>();
+    private Item _currentItem;
 
     public static event EventHandler<int> RemovedItem;
 
@@ -37,25 +37,25 @@
 
     private async Task LoadStoreItems()
     {
-        storeItems.Clear();
-        storeLength = await localStore.LengthAsync();
+        _storeItems.Clear();
+        _storeLength = await localStore.LengthAsync();
 
-        for (int i = 0; i < storeLength; i++)
+        for (int i = 0; i < _storeLength; i++)
         {
-            storeItems.Add(await GetItem(i));
+            _storeItems.Add(await GetItem(i));
         }
     }
 
     private void ItemManagerOnItemAdded(object sender, ItemAddedEventArgs<Item> args)
     {
-        storeItems.Add(args.Item.Clone());
+        _storeItems.Add(args.Item.Clone());
 
         StateHasChanged();
     }
 
     private void ItemManagerOnRemovedAllItems()
     {
-        storeItems.Clear();
+        _storeItems.Clear();
 
         StateHasChanged();
     }
@@ -76,19 +76,19 @@
 
     private async void SliderValueChanged(SliderEventCallbackArgs args)
     {
-        currentItem = await GetItem(args.ItemId);
+        _currentItem = await GetItem(args.ItemId);
 
-        currentItem.Value = storeItems[args.ItemId].Value = args.Value;
+        _currentItem.Value = _storeItems[args.ItemId].Value = args.Value;
 
         StateHasChanged();
 
-        await localStore.SetItemAsync<Item>(currentItem.ItemId.ToString(), currentItem);
+        await localStore.SetItemAsync<Item>(_currentItem.ItemId.ToString(), _currentItem);
     }
 
     public async void RemoveItemClicked(int itemId)
     {
         // see Extensions/Events.cs. this shit convoluted but can't await otherwise?
-        // this invocation MUST be finished before attempting to reload storeItems.
+        // this invocation MUST be finished before attempting to reload _storeItems.
         await RemovedItem?.InvokeAsync(this, itemId);
 
         await LoadStoreItems();
@@ -98,9 +98,9 @@
 
     private async void UpdateItemClicked(UpdateEventCallbackArgs args)
     {
-        storeItems[args.ItemId].Title = args.Title;
+        _storeItems[args.ItemId].Title = args.Title;
 
-        await localStore.SetItemAsync<Item>(args.ItemId.ToString(), storeItems[args.ItemId]);
+        await localStore.SetItemAsync<Item>(args.ItemId.ToString(), _storeItems[args.ItemId]);
 
         StateHasChanged();
     }

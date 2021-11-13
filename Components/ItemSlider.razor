@@ -2,7 +2,7 @@
 [id="@ItemId"]::-moz-range-track {
     height: 8.4px;
     border-radius: 2.5px;
-    background: rgb(@sliderBackground.Red, @sliderBackground.Green, @sliderBackground.Blue);
+    background: rgb(@_sliderBackground.Red, @_sliderBackground.Green, @_sliderBackground.Blue);
 }
 </style>
 
@@ -10,14 +10,14 @@
     <input
         type="range"
         id="@ItemId"
-        min="@sliderMin"
-        max="@sliderMax"
-        step="@sliderStep"
-        @bind="@sliderValue"
+        min="@_sliderMin"
+        max="@_sliderMax"
+        step="@_sliderStep"
+        @bind="@_sliderValue"
         @oninput="@((args) => SliderOnInput(Convert.ToSingle(args.Value)))"
     />
 
-    @sliderValue.ToString("00.0")
+    @_sliderValue.ToString("00.0")
 
     <button
         class="btn btn-primary"
@@ -34,7 +34,7 @@
             Subtract
     </button>
 
-    @if (editMode)
+    @if (_editMode)
     {
         <input
             type="text"
@@ -83,10 +83,10 @@
     [Parameter]
     public EventCallback<int>                       OnRemoveItemClicked { get; set; }
 
-    private float   sliderMin = 0.0f,
-                    sliderMax = 10.0f,
-                    sliderStep = 0.1f;
-    private float   sliderValue
+    private float   _sliderMin = 0.0f,
+                    _sliderMax = 10.0f,
+                    _sliderStep = 0.1f;
+    private float   _sliderValue
                     {
                         get => SliderValue;
                         set
@@ -97,14 +97,14 @@
                         }
                     }
 
-    private Colour  firstColour = Colour.GreenYellow,
-                    middleColour = Colour.Gold,
-                    lastColour = Colour.Crimson,
-                    sliderBackground = Colour.GreenYellow;
+    private Colour  _firstColour = Colour.GreenYellow,
+                    _middleColour = Colour.Gold,
+                    _lastColour = Colour.Crimson,
+                    _sliderBackground = Colour.GreenYellow;
 
-    private bool    isButtonHeld = false;
-    private bool    editMode = false;
-    private string  oldTitle;
+    private bool    _isButtonHeld = false;
+    private bool    _editMode = false;
+    private string  _oldTitle;
 
     private enum Direction
     {
@@ -112,7 +112,7 @@
         Left
     }
 
-    private Direction currentDirection;
+    private Direction _currentDirection;
 
     protected override void OnParametersSet()
     {
@@ -128,14 +128,14 @@
 
     private async Task HoldButton(Direction dir)
     {
-        isButtonHeld = true;
-        currentDirection = dir;
+        _isButtonHeld = true;
+        _currentDirection = dir;
         int speed = 64;
-        while (isButtonHeld)
+        while (_isButtonHeld)
         {
             if (speed.CheckPowerOfTwo())
             {
-                ModifySlider(currentDirection);
+                ModifySlider(_currentDirection);
                 StateHasChanged();
             }
             await Task.Delay(20);
@@ -145,14 +145,14 @@
 
     private void LetGoButton()
     {
-        isButtonHeld = false;
+        _isButtonHeld = false;
         // EventCallback takes place only after the button is let go
-        sliderValue = MathF.Round(SliderValue, 1);
+        _sliderValue = MathF.Round(SliderValue, 1);
     }
 
     private void LerpSliderBackground(float value)
     {
-        sliderBackground = firstColour.Lerp(value.Normalize(sliderMin, sliderMax), middleColour, lastColour);
+        _sliderBackground = _firstColour.Lerp(value.Normalize(_sliderMin, _sliderMax), _middleColour, _lastColour);
     }
 
     private void SliderOnInput(float value)
@@ -163,9 +163,9 @@
 
     private void EditItem(int itemId)
     {
-        editMode = true;
+        _editMode = true;
 
-        oldTitle = Title;
+        _oldTitle = Title;
     }
 
     private async void RemoveItem(int itemId)
@@ -177,14 +177,14 @@
     {
         await OnUpdateItemClicked.InvokeAsync(args);
 
-        editMode = false;
+        _editMode = false;
     }
 
     private void CancelEditItem()
     {
-        editMode = false;
+        _editMode = false;
 
-        Title = oldTitle;
+        Title = _oldTitle;
     }
 
 }

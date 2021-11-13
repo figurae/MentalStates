@@ -5,21 +5,21 @@ namespace MentalStates.Extensions
 {
     public class ExtendedSynchronizationContext : SynchronizationContext
     {
-        private readonly Action completed;
+        private readonly Action _completed;
 
         public ExtendedSynchronizationContext(Action completed)
         {
-            this.completed = completed;
+            _completed = completed;
         }
 
         public override SynchronizationContext CreateCopy()
         {
-            return new ExtendedSynchronizationContext(this.completed);
+            return new ExtendedSynchronizationContext(_completed);
         }
 
         public override void OperationCompleted()
         {
-            this.completed();
+            _completed();
         }
 
     }

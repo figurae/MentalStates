@@ -7,9 +7,9 @@ namespace MentalStates.Extensions
 {
     public static class EventInvokeAsync
     {
-        public static Task InvokeAsync<T>(this EventHandler<T> @this, object sender, T eventArgs)
+        public static Task InvokeAsync<T>(this EventHandler<T> eventHandler, object sender, T eventArgs)
         {
-            if (@this == null)
+            if (eventHandler == null)
             {
                 return Task.CompletedTask;
             }
@@ -19,7 +19,7 @@ namespace MentalStates.Extensions
 
             SynchronizationContext.SetSynchronizationContext(sc);
 
-            @this.Invoke(sender, eventArgs);
+            eventHandler.Invoke(sender, eventArgs);
 
             return tcs.Task;
         }
@@ -29,14 +29,14 @@ namespace MentalStates.Extensions
     {
         public ItemAddedEventArgs(Item item)
         {
-            m_item = item;
+            _item = item;
         }
 
-        private Item m_item;
+        private Item _item;
 
         public Item Item
         {
-            get { return m_item; }
+            get { return _item; }
         }
     }
 
@@ -44,29 +44,29 @@ namespace MentalStates.Extensions
     {
         public SliderEventCallbackArgs(int itemId, float value)
         {
-            m_itemId = itemId;
-            m_value = value;
+            _itemId = itemId;
+            _value = value;
         }
 
-        private int m_itemId;
-        private float m_value;
+        private int _itemId;
+        private float _value;
 
-        public int ItemId { get { return m_itemId; } }
-        public float Value { get { return m_value; } }
+        public int ItemId { get { return _itemId; } }
+        public float Value { get { return _value; } }
     }
 
     public class UpdateEventCallbackArgs
     {
         public UpdateEventCallbackArgs(int itemId, string title)
         {
-            m_itemId = itemId;
-            m_title = title;
+            _itemId = itemId;
+            _title = title;
         }
 
-        private int m_itemId;
-        private string m_title;
+        private int _itemId;
+        private string _title;
 
-        public int ItemId { get { return m_itemId; } }
-        public string Title { get { return m_title; } }
+        public int ItemId { get { return _itemId; } }
+        public string Title { get { return _title; } }
     }
 }

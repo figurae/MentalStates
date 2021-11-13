@@ -4,19 +4,19 @@
 <p>
     <select
         class="selectpicker"
-        @bind="currentItem.Type">
+        @bind="_currentItem.Type">
             <option value="@Item.ItemType.Note">Note</option>
             <option value="@Item.ItemType.Slider">Slider</option>
     </select>
-    
+
     <input
         type="text"
         placeholder="Title"
-        @bind="currentItem.Title" />
+        @bind="_currentItem.Title" />
     <input
         type="text"
         placeholder="Description"
-        @bind="currentItem.Description" />
+        @bind="_currentItem.Description" />
 
     <button
         class="btn btn-primary"
@@ -31,8 +31,8 @@
 </p>
 
 @code {
-    private int currentItemId;
-    private Item currentItem;
+    private int _currentItemId;
+    private Item _currentItem;
 
     public static event Action RemovedAllItems;
     // Action<> perhaps instead of EventHandler? (I don't think so)
@@ -43,25 +43,25 @@
     {
         InitializeCurrentItem();
         Main.RemovedItem += MainOnRemovedItem;
-        currentItemId = await localStore.LengthAsync();
+        _currentItemId = await localStore.LengthAsync();
     }
     private async void AddItem()
     {
         for (int i = 0; i < await localStore.LengthAsync(); i++)
         {
             // TODO: error handling
-            if (currentItem.Title == (await GetItem(i)).Title) return;
+            if (_currentItem.Title == (await GetItem(i)).Title) return;
         }
 
-        currentItem.ItemId = currentItemId;
-        currentItem.Created = currentItem.Updated = DateTime.Now;
+        _currentItem.ItemId = _currentItemId;
+        _currentItem.Created = _currentItem.Updated = DateTime.Now;
 
-        await localStore.SetItemAsync<Item>(currentItemId.ToString(), currentItem);
+        await localStore.SetItemAsync<Item>(_currentItemId.ToString(), _currentItem);
 
-        ItemAddedEventArgs = new ItemAddedEventArgs<Item>(currentItem);
+        ItemAddedEventArgs = new ItemAddedEventArgs<Item>(_currentItem);
         ItemAdded?.Invoke(this, ItemAddedEventArgs);
 
-        currentItemId++;
+        _currentItemId++;
         InitializeCurrentItem();
 
         StateHasChanged();
@@ -71,7 +71,7 @@
     {
         await localStore.ClearAsync();
 
-        currentItemId = 0;
+        _currentItemId = 0;
 
         RemovedAllItems?.Invoke();
     }
@@ -86,14 +86,14 @@
         {
             for (int i = itemId; i < storeLength; i++)
             {
-                currentItem = await localStore.GetItemAsync<Item>((i + 1).ToString());
-                currentItem.ItemId = i;
-                await localStore.SetItemAsync<Item>(i.ToString(), currentItem);
+                _currentItem = await localStore.GetItemAsync<Item>((i + 1).ToString());
+                _currentItem.ItemId = i;
+                await localStore.SetItemAsync<Item>(i.ToString(), _currentItem);
             }
             await localStore.RemoveItemAsync((storeLength).ToString());
         }
 
-        currentItemId = storeLength;
+        _currentItemId = storeLength;
         InitializeCurrentItem();
 
         StateHasChanged();
@@ -106,7 +106,7 @@
 
     private void InitializeCurrentItem()
     {
-        currentItem = new Item
+        _currentItem = new Item
                     {
                         ItemId = -1,
                         Title = "",
