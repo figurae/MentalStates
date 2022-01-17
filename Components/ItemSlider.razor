@@ -77,7 +77,7 @@
     [Parameter]
     public float    SliderValue { get; set; }
     [Parameter]
-    public EventCallback<SliderEventCallbackArgs>   OnSliderValueChanged { get; set; }
+    public EventCallback<SliderEventCallbackArgs>   OnSliderMoved { get; set; }
     [Parameter]
     public EventCallback<UpdateEventCallbackArgs>   OnUpdateItemClicked { get; set; }
     [Parameter]
@@ -93,7 +93,7 @@
                         {
                             SliderValue = value;
                             SliderEventCallbackArgs args = new SliderEventCallbackArgs(ItemId, value);
-                            OnSliderValueChanged.InvokeAsync(args);
+                            OnSliderMoved.InvokeAsync(args);
                         }
                     }
 

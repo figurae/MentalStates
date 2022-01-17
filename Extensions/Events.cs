@@ -25,9 +25,9 @@ namespace MentalStates.Extensions
         }
     }
 
-    public class ItemAddedEventArgs<T> : EventArgs
+    public class ItemUpdatedEventArgs<T> : EventArgs
     {
-        public ItemAddedEventArgs(Item item)
+        public ItemUpdatedEventArgs(Item item)
         {
             _item = item;
         }

@@ -2,16 +2,16 @@
 @implements IDisposable
 
 <div>
-    <MentalStates.Components.ItemManager />
-    @for (int i = 0; i < _storeItems.Count; i++)
+    <MentalStates.Components.ItemManager @bind-AllItems="_storeItems" />
+    @if (_storeItems != null)
     {
-        if (_storeItems[i] != null)
+        for (int i = 0; i < _storeItems.Count; i++)
         {
             <MentalStates.Components.ItemSlider
             ItemId="@_storeItems[i].ItemId"
             Title="@_storeItems[i].Title.ToString()"
             SliderValue="@_storeItems[i].Value"
-            OnSliderValueChanged="SliderValueChanged"
+            OnSliderMoved="SliderMoved"
             OnRemoveItemClicked="RemoveItemClicked"
             OnUpdateItemClicked="UpdateItemClicked" />
         }
@@ -20,43 +20,21 @@
 
 @code
 {
-    private int _storeLength;
-    private List<Item> _storeItems = new List<Item>();
+    private List<Item> _storeItems { get; set; }
     private Item _currentItem;
 
-    public static event EventHandler<int> RemovedItem;
+    public static event EventHandler<SliderEventCallbackArgs>   SliderValueChanged;
+    public static event EventHandler<UpdateEventCallbackArgs>   ItemUpdated;
+    public static event EventHandler<int>                       ItemRemoved;
 
-    protected override async Task OnInitializedAsync()
+    protected override void OnInitialized()
     {
         // event/state manager to handle all types of events?
         ItemManager.ItemAdded += ItemManagerOnItemAdded;
-        ItemManager.RemovedAllItems += ItemManagerOnRemovedAllItems;
-
-        await LoadStoreItems();
     }
 
-    private async Task LoadStoreItems()
+    private void ItemManagerOnItemAdded(object sender, EventArgs e)
     {
-        _storeItems.Clear();
-        _storeLength = await localStore.LengthAsync();
-
-        for (int i = 0; i < _storeLength; i++)
-        {
-            _storeItems.Add(await GetItem(i));
-        }
-    }
-
-    private void ItemManagerOnItemAdded(object sender, ItemAddedEventArgs<Item> args)
-    {
-        _storeItems.Add(args.Item.Clone());
-
-        StateHasChanged();
-    }
-
-    private void ItemManagerOnRemovedAllItems()
-    {
-        _storeItems.Clear();
-
         StateHasChanged();
     }
 
@@ -65,7 +43,6 @@
     {
         System.Console.WriteLine("Inside Dispose()");
         ItemManager.ItemAdded -= ItemManagerOnItemAdded;
-        ItemManager.RemovedAllItems -= ItemManagerOnRemovedAllItems;
     }
 
 
@@ -74,34 +51,18 @@
         return await localStore.GetItemAsync<Item>(itemId.ToString());
     }
 
-    private async void SliderValueChanged(SliderEventCallbackArgs args)
+    private void SliderMoved(SliderEventCallbackArgs args)
     {
-        _currentItem = await GetItem(args.ItemId);
-
-        _currentItem.Value = _storeItems[args.ItemId].Value = args.Value;
-
-        StateHasChanged();
-
-        await localStore.SetItemAsync<Item>(_currentItem.ItemId.ToString(), _currentItem);
+        SliderValueChanged?.Invoke(this, args);
     }
 
-    public async void RemoveItemClicked(int itemId)
+    private void UpdateItemClicked(UpdateEventCallbackArgs args)
     {
-        // see Extensions/Events.cs. this shit convoluted but can't await otherwise?
-        // this invocation MUST be finished before attempting to reload _storeItems.
-        await RemovedItem?.InvokeAsync(this, itemId);
-
-        await LoadStoreItems();
-
-        StateHasChanged();
+        ItemUpdated?.Invoke(this, args);
     }
 
-    private async void UpdateItemClicked(UpdateEventCallbackArgs args)
+    private void RemoveItemClicked(int itemId)
     {
-        _storeItems[args.ItemId].Title = args.Title;
-
-        await localStore.SetItemAsync<Item>(args.ItemId.ToString(), _storeItems[args.ItemId]);
-
-        StateHasChanged();
+        ItemRemoved?.Invoke(this, itemId);
     }
 }

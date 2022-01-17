@@ -31,35 +31,63 @@
 </p>
 
 @code {
-    private int _currentItemId;
-    private Item _currentItem;
+    [Parameter]
+    public List<Item> AllItems { get; set; }
+    [Parameter]
+    public EventCallback<List<Item>> AllItemsChanged { get; set; }
 
-    public static event Action RemovedAllItems;
-    // Action<> perhaps instead of EventHandler? (I don't think so)
-    public static event EventHandler<ItemAddedEventArgs<Item>> ItemAdded;
-    public ItemAddedEventArgs<Item> ItemAddedEventArgs;
+    // Action<> perhaps instead of EventHandler? (I don't think so).
+    public static event EventHandler ItemAdded;
+
+    private int         _currentItemId;
+    private Item        _currentItem;
+    // automatically invoke EventCallback when set.
+    private List<Item>  _allItems
+        {
+            get => AllItems;
+            set
+            {
+                AllItems = value;
+                AllItemsChanged.InvokeAsync(value);
+            }
+        }
 
     protected override async Task OnInitializedAsync()
     {
         InitializeCurrentItem();
-        Main.RemovedItem += MainOnRemovedItem;
-        _currentItemId = await localStore.LengthAsync();
-    }
-    private async void AddItem()
-    {
-        for (int i = 0; i < await localStore.LengthAsync(); i++)
+        Main.SliderValueChanged += MainOnSliderValueChanged;
+        Main.ItemUpdated += MainOnItemUpdated;
+        Main.ItemRemoved += MainOnItemRemoved;
+        _allItems = await GetItems();
+        if (_allItems != null)
         {
-            // TODO: error handling
-            if (_currentItem.Title == (await GetItem(i)).Title) return;
+            _currentItemId = _allItems[^1].ItemId + 1;
+        }
+    }
+    private async void AddItem(EventArgs e)
+    {
+        if (_allItems == null)
+        {
+            _allItems = new List<Item>();
+        }
+        else
+        {
+            // don't add an item if the title is the same.
+            for (int i = 0; i < _allItems.Count; i++)
+            {
+                // TODO: error handling.
+                if (_currentItem.Title == _allItems[i].Title) return;
+            }
         }
 
         _currentItem.ItemId = _currentItemId;
         _currentItem.Created = _currentItem.Updated = DateTime.Now;
 
-        await localStore.SetItemAsync<Item>(_currentItemId.ToString(), _currentItem);
+        _allItems.Add(_currentItem);
 
-        ItemAddedEventArgs = new ItemAddedEventArgs<Item>(_currentItem);
-        ItemAdded?.Invoke(this, ItemAddedEventArgs);
+        await SetItems(_allItems);
+
+        ItemAdded?.Invoke(this, e);
 
         _currentItemId++;
         InitializeCurrentItem();
@@ -71,37 +99,57 @@
     {
         await localStore.ClearAsync();
 
+        _allItems = new List<Item>();
         _currentItemId = 0;
-
-        RemovedAllItems?.Invoke();
     }
 
-    public async void MainOnRemovedItem(object sender, int itemId)
+    public async void MainOnSliderValueChanged(object sender, SliderEventCallbackArgs args)
     {
-        await localStore.RemoveItemAsync(itemId.ToString());
-        int storeLength = await localStore.LengthAsync();
+        _allItems[_allItems.FindIndex(x => x.ItemId == args.ItemId)].Value = args.Value;
 
-        // slow spergy reordering is slow
-        if (itemId < storeLength)
+        await UpdateItems(_allItems);
+    }
+
+    public async void MainOnItemUpdated(object sender, UpdateEventCallbackArgs args)
+    {
+        _allItems[_allItems.FindIndex(x => x.ItemId == args.ItemId)].Title = args.Title;
+
+        await UpdateItems(_allItems);
+    }
+
+    public async void MainOnItemRemoved(object sender, int itemId)
+    {
+        _allItems.RemoveAt(_allItems.FindIndex(x => x.ItemId == itemId));
+
+        if (_allItems.Count == 0)
         {
-            for (int i = itemId; i < storeLength; i++)
-            {
-                _currentItem = await localStore.GetItemAsync<Item>((i + 1).ToString());
-                _currentItem.ItemId = i;
-                await localStore.SetItemAsync<Item>(i.ToString(), _currentItem);
-            }
-            await localStore.RemoveItemAsync((storeLength).ToString());
+            await localStore.ClearAsync();
+            _currentItemId = 0;
         }
+        else
+        {
+            await UpdateItems(_allItems);
+        }
+    }
 
-        _currentItemId = storeLength;
+    private async Task UpdateItems(List<Item> items)
+    {
+        await SetItems(_allItems);
+
+        _currentItemId = _allItems[^1].ItemId + 1;
         InitializeCurrentItem();
 
         StateHasChanged();
     }
 
-    private async Task<Item> GetItem(int itemId)
+    private async Task<List<Item>> GetItems()
     {
-        return await localStore.GetItemAsync<Item>(itemId.ToString());
+        return await localStore.GetItemAsync<List<Item>>("items");
+    }
+
+    private async Task SetItems(List<Item> items)
+    {
+        await localStore.SetItemAsync<List<Item>>("items", items);
     }
 
     private void InitializeCurrentItem()
@@ -121,6 +169,8 @@
 
     public void Dispose()
     {
-        Main.RemovedItem -= MainOnRemovedItem;
+        Main.SliderValueChanged -= MainOnSliderValueChanged;
+        Main.ItemUpdated -= MainOnItemUpdated;
+        Main.ItemRemoved -= MainOnItemRemoved;
     }
 }
