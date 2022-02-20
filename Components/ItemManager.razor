@@ -1,36 +1,152 @@
 @inject Blazored.LocalStorage.ILocalStorageService localStore
 @implements IDisposable
 
+<style>
+    select {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 150px;
+    }
+</style>
+
 <p>
     <select
         class="selectpicker"
-        @bind="_currentItem.Type">
-            <option value="@Item.ItemType.Note">Note</option>
-            <option value="@Item.ItemType.Slider">Slider</option>
+        @bind="SelectedSetId">
+            <option
+                value="-1"
+                disabled
+                hidden>
+                    Select set
+            </option>
+            @if (_allSets != null)
+            {
+                foreach (var set in _allSets.OrderBy(x => x.Name).ToList())
+                {
+                    <option
+                        value="@set.SetId">
+                            @set.Name
+                    </option>
+                }
+            }
+            else
+            {
+                <option
+                    value=""
+                    disabled>
+                        No sets in database
+                </option>
+            }
     </select>
 
-    <input
-        type="text"
-        placeholder="Title"
-        @bind="_currentItem.Title" />
-    <input
-        type="text"
-        placeholder="Description"
-        @bind="_currentItem.Description" />
+    <button
+        class="btn btn-primary"
+        @onclick="AddSetMode">
+            Create a new set
+    </button>
 
-    <button
-        class="btn btn-primary"
-        @onclick="AddItem">
-            Add
-    </button>
-    <button
-        class="btn btn-primary"
-        @onclick="RemoveAllItems">
-            Clear
-    </button>
+    @if (_addSetMode)
+    {
+        <br />
+        <input
+            type="text"
+            placeholder="Set name"
+            @bind="_currentSet.Name" />
+        <input
+            type="text"
+            placeholder="Set description"
+            @bind="_currentSet.Description" />
+
+        <button
+            class="btn btn-primary"
+            @onclick="AddSet">
+                Save
+        </button>
+        <button
+            class="btn btn-primary"
+            @onclick="AddSetMode">
+                Cancel
+        </button>
+    }
 </p>
+<!-- show only if a set is selected -->
+@if (SelectedSetId >= 0)
+{
+    <p>
+        Set name: @_currentSet.Name, description: @_currentSet.Description.
+        <button
+            class="btn btn-primary"
+            @onclick="ModifySet">
+                Update this set
+        </button>
+        <button
+            class="btn btn-primary"
+            @onclick="RemoveSet">
+                Delete this set
+        </button>
+    </p>
+    <p>
+        <select
+            class="selectpicker"
+            @bind="_currentItem.Type">
+                <option
+                    value="@Item.ItemType.NoType"
+                    disabled
+                    hidden>
+                        Select item type
+                </option>
+                <option
+                    value="@Item.ItemType.Note">
+                        Note
+                </option>
+                <option
+                    value="@Item.ItemType.Slider">
+                        Slider
+                </option>
+        </select>
+
+        <input
+            type="text"
+            placeholder="Title"
+            @bind="_currentItem.Title" />
+        <input
+            type="text"
+            placeholder="Description"
+            @bind="_currentItem.Description" />
+
+        <button
+            class="btn btn-primary"
+            @onclick="AddItem">
+                Add a new item
+        </button>
+        <button
+            class="btn btn-primary"
+            @onclick="RemoveAllItems">
+                Delete all items
+        </button>
+    </p>
+}
 
 @code {
+    [Parameter]
+    public int SelectedSetId
+    {
+        get
+        {
+            return _selectedSetId;
+        }
+        set
+        {
+            // TODO: error handling.
+            _addSetMode = false;
+            _selectedSetId = value;
+            _currentSet = _allSets[value];
+            // load items from selected set.
+            _allItems = new List<Item>(_allSets[value].Items);
+            _currentItemId = _allItems[^1].ItemId + 1;
+        }
+    }
     [Parameter]
     public List<Item> AllItems { get; set; }
     [Parameter]
@@ -39,9 +155,14 @@
     // Action<> perhaps instead of EventHandler? (I don't think so).
     public static event EventHandler ItemAdded;
 
-    private int         _currentItemId;
+    private int         _selectedSetId = -1;
+    private int         _currentSetId = 0;
+    private Set         _currentSet;
+    private List<Set>   _allSets;
+    private bool        _addSetMode = false;
+    private int         _currentItemId = 0;
     private Item        _currentItem;
-    // automatically invoke EventCallback when set.
+    // automagically invoke EventCallback when set.
     private List<Item>  _allItems
         {
             get => AllItems;
@@ -54,30 +175,41 @@
 
     protected override async Task OnInitializedAsync()
     {
+        InitializeCurrentSet();
         InitializeCurrentItem();
+
         Main.SliderValueChanged += MainOnSliderValueChanged;
         Main.ItemUpdated += MainOnItemUpdated;
         Main.ItemRemoved += MainOnItemRemoved;
-        _allItems = await GetItems();
-        if (_allItems != null)
+
+        _allSets = await GetSets();
+
+        if (_allSets != null)
         {
-            _currentItemId = _allItems[^1].ItemId + 1;
+            _currentSetId = _allSets[^1].SetId + 1;
         }
     }
     private async void AddItem(EventArgs e)
     {
-        if (_allItems == null)
+        if (_currentItem.Title == "")
         {
-            _allItems = new List<Item>();
+            // TODO: error handling.
+            return;
         }
-        else
+
+        if (_allItems != null)
         {
             // don't add an item if the title is the same.
             for (int i = 0; i < _allItems.Count; i++)
             {
                 // TODO: error handling.
-                if (_currentItem.Title == _allItems[i].Title) return;
+                if (_currentItem.Title == _allItems[i].Title)
+                    return;
             }
+        }
+        else
+        {
+            _allItems = new List<Item>();
         }
 
         _currentItem.ItemId = _currentItemId;
@@ -85,19 +217,24 @@
 
         _allItems.Add(_currentItem);
 
-        await SetItems(_allItems);
+        await SaveItems(_allItems);
 
         ItemAdded?.Invoke(this, e);
 
         _currentItemId++;
+
+        Item.ItemType _previousType = _currentItem.Type;
+
         InitializeCurrentItem();
+
+        _currentItem.Type = _previousType;
 
         StateHasChanged();
     }
 
-    private async void RemoveAllItems()
+    private async Task RemoveAllItems()
     {
-        await localStore.ClearAsync();
+        await localStore.RemoveItemAsync("items");
 
         _allItems = new List<Item>();
         _currentItemId = 0;
@@ -105,14 +242,20 @@
 
     public async void MainOnSliderValueChanged(object sender, SliderEventCallbackArgs args)
     {
-        _allItems[_allItems.FindIndex(x => x.ItemId == args.ItemId)].Value = args.Value;
+        int index = _allItems.FindIndex(x => x.ItemId == args.ItemId);
+
+        _allItems[index].Value = args.Value;
+        _allItems[index].Updated = DateTime.Now;
 
         await UpdateItems(_allItems);
     }
 
     public async void MainOnItemUpdated(object sender, UpdateEventCallbackArgs args)
     {
-        _allItems[_allItems.FindIndex(x => x.ItemId == args.ItemId)].Title = args.Title;
+        int index = _allItems.FindIndex(x => x.ItemId == args.ItemId);
+
+        _allItems[index].Title = args.Title;
+        _allItems[index].Updated = DateTime.Now;
 
         await UpdateItems(_allItems);
     }
@@ -123,8 +266,7 @@
 
         if (_allItems.Count == 0)
         {
-            await localStore.ClearAsync();
-            _currentItemId = 0;
+            await RemoveAllItems();
         }
         else
         {
@@ -134,7 +276,7 @@
 
     private async Task UpdateItems(List<Item> items)
     {
-        await SetItems(_allItems);
+        await SaveItems(_allItems);
 
         _currentItemId = _allItems[^1].ItemId + 1;
         InitializeCurrentItem();
@@ -147,7 +289,7 @@
         return await localStore.GetItemAsync<List<Item>>("items");
     }
 
-    private async Task SetItems(List<Item> items)
+    private async Task SaveItems(List<Item> items)
     {
         await localStore.SetItemAsync<List<Item>>("items", items);
     }
@@ -161,10 +303,105 @@
                         Description = "",
                         Value = 0.0f,
                         Notes = "",
-                        Type = 0,
+                        Type = Item.ItemType.NoType,
                         Created = DateTime.UnixEpoch,
                         Updated = DateTime.UnixEpoch
                     };
+    }
+
+    private async Task AddSetMode()
+    {
+        if (_selectedSetId >= 0)
+        {
+            await RemoveAllItems();
+            _selectedSetId = -1;
+        }
+
+        InitializeCurrentSet();
+
+        _addSetMode = !_addSetMode;
+    }
+
+    private async Task AddSet()
+    {
+        if (_currentSet.Name == "" || _allItems == null)
+        {
+            // TODO: error handling.
+            return;
+        }
+
+        if (_allSets != null)
+        {
+            // don't add a set if the name is the same.
+            for (int i = 0; i < _allSets.Count; i++)
+            {
+                // TODO: error handling.
+                if (_currentSet.Name == _allSets[i].Name)
+                    return;
+            }
+        }
+        else
+        {
+            _allSets = new List<Set>();
+        }
+
+        _currentSet.SetId = _currentSetId;
+        _currentSet.Items = _allItems;
+        _currentSet.Created = _currentSet.Updated = DateTime.Now;
+
+        _allSets.Add(_currentSet);
+
+        await SaveSets(_allSets);
+
+        _currentSetId++;
+        InitializeCurrentSet();
+
+        await RemoveAllItems();
+    }
+
+    private async Task ModifySet()
+    {
+        await SaveSets(_allSets);
+        await RemoveAllItems();
+    }
+
+    private async Task RemoveSet()
+    {
+        _allSets.RemoveAt(SelectedSetId);
+
+        await RemoveAllItems();
+
+        if (_allSets.Count == 0)
+        {
+            await localStore.RemoveItemAsync("sets");
+            _currentSetId = 0;
+        }
+        else
+        {
+            await SaveSets(_allSets);
+        }
+    }
+
+    private async Task<List<Set>> GetSets()
+    {
+        return await localStore.GetItemAsync<List<Set>>("sets");
+    }
+
+    private async Task SaveSets(List<Set> sets)
+    {
+        await localStore.SetItemAsync<List<Set>>("sets", sets);
+    }
+
+    private void InitializeCurrentSet()
+    {
+        _currentSet = new Set
+                {
+                    SetId = -1,
+                    Name = "",
+                    Description = "",
+                    Created = DateTime.UnixEpoch,
+                    Updated = DateTime.UnixEpoch
+                };
     }
 
     public void Dispose()
