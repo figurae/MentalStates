@@ -71,7 +71,7 @@
 
 @code {
     [Parameter]
-    public string   Title { get; set; }
+    public string?  Title { get; set; }
     [Parameter]
     public int      ItemId { get; set; }
     [Parameter]
@@ -104,7 +104,7 @@
 
     private bool    _isButtonHeld = false;
     private bool    _editMode = false;
-    private string  _oldTitle;
+    private string? _oldTitle;
 
     private enum Direction
     {

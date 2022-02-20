@@ -46,7 +46,7 @@
             Create a new set
     </button>
 
-    @if (_addSetMode)
+    @if (_addSetMode && _currentSet != null)
     {
         <br />
         <input
@@ -71,7 +71,7 @@
     }
 </p>
 <!-- show only if a set is selected -->
-@if (SelectedSetId >= 0)
+@if (SelectedSetId >= 0 && _currentSet != null && _currentItem != null)
 {
     <p>
         Set name: @_currentSet.Name, description: @_currentSet.Description.
@@ -140,30 +140,36 @@
         {
             // TODO: error handling.
             _addSetMode = false;
+
             _selectedSetId = value;
-            _currentSet = _allSets[value];
-            // load items from selected set.
-            _allItems = new List<Item>(_allSets[value].Items);
-            _currentItemId = _allItems[^1].ItemId + 1;
+
+            if (_allSets != null)
+            {
+                _currentSet = _allSets[value];
+
+                _allItems = new List<Item>(_allSets[value].Items);
+
+                _currentItemId = _allItems[^1].ItemId + 1;
+            }
         }
     }
     [Parameter]
-    public List<Item> AllItems { get; set; }
+    public List<Item>? AllItems { get; set; }
     [Parameter]
     public EventCallback<List<Item>> AllItemsChanged { get; set; }
 
     // Action<> perhaps instead of EventHandler? (I don't think so).
-    public static event EventHandler ItemAdded;
+    public static event EventHandler? ItemAdded;
 
     private int         _selectedSetId = -1;
     private int         _currentSetId = 0;
-    private Set         _currentSet;
-    private List<Set>   _allSets;
+    private Set?        _currentSet;
+    private List<Set>?  _allSets;
     private bool        _addSetMode = false;
     private int         _currentItemId = 0;
-    private Item        _currentItem;
+    private Item?       _currentItem;
     // automagically invoke EventCallback when set.
-    private List<Item>  _allItems
+    private List<Item>? _allItems
         {
             get => AllItems;
             set
@@ -191,7 +197,7 @@
     }
     private async void AddItem(EventArgs e)
     {
-        if (_currentItem.Title == "")
+        if (_currentItem == null || _currentItem.Title == "")
         {
             // TODO: error handling.
             return;
@@ -240,8 +246,11 @@
         _currentItemId = 0;
     }
 
-    public async void MainOnSliderValueChanged(object sender, SliderEventCallbackArgs args)
+    public async void MainOnSliderValueChanged(object? sender, SliderEventCallbackArgs args)
     {
+        if (_allItems == null)
+            return;
+
         int index = _allItems.FindIndex(x => x.ItemId == args.ItemId);
 
         _allItems[index].Value = args.Value;
@@ -250,8 +259,11 @@
         await UpdateItems(_allItems);
     }
 
-    public async void MainOnItemUpdated(object sender, UpdateEventCallbackArgs args)
+    public async void MainOnItemUpdated(object? sender, UpdateEventCallbackArgs args)
     {
+        if (_allItems == null)
+            return;
+
         int index = _allItems.FindIndex(x => x.ItemId == args.ItemId);
 
         _allItems[index].Title = args.Title;
@@ -260,8 +272,11 @@
         await UpdateItems(_allItems);
     }
 
-    public async void MainOnItemRemoved(object sender, int itemId)
+    public async void MainOnItemRemoved(object? sender, int itemId)
     {
+        if (_allItems == null)
+            return;
+
         _allItems.RemoveAt(_allItems.FindIndex(x => x.ItemId == itemId));
 
         if (_allItems.Count == 0)
@@ -276,6 +291,9 @@
 
     private async Task UpdateItems(List<Item> items)
     {
+        if (_allItems == null)
+            return;
+
         await SaveItems(_allItems);
 
         _currentItemId = _allItems[^1].ItemId + 1;
@@ -324,7 +342,7 @@
 
     private async Task AddSet()
     {
-        if (_currentSet.Name == "" || _allItems == null)
+        if (_currentSet == null || _currentSet.Name == "" || _allItems == null)
         {
             // TODO: error handling.
             return;
@@ -361,12 +379,18 @@
 
     private async Task ModifySet()
     {
+        if (_allSets == null)
+            return;
+
         await SaveSets(_allSets);
         await RemoveAllItems();
     }
 
     private async Task RemoveSet()
     {
+        if (_allSets == null)
+            return;
+
         _allSets.RemoveAt(SelectedSetId);
 
         await RemoveAllItems();

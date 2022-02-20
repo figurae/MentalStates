@@ -61,7 +61,7 @@ namespace MentalStates.Extensions
         }
 
         // should return round numbers.
-        public string ToString(string format, IFormatProvider formatProvider)
+        public string ToString(string? format, IFormatProvider? formatProvider)
         {
             throw new NotImplementedException();
         }

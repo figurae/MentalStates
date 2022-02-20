@@ -20,12 +20,12 @@
 
 @code
 {
-    private List<Item> _storeItems { get; set; }
-    private Item _currentItem;
+    private List<Item>? _storeItems { get; set; }
+    private Item? _currentItem;
 
-    public static event EventHandler<SliderEventCallbackArgs>   SliderValueChanged;
-    public static event EventHandler<UpdateEventCallbackArgs>   ItemUpdated;
-    public static event EventHandler<int>                       ItemRemoved;
+    public static event EventHandler<SliderEventCallbackArgs>?  SliderValueChanged;
+    public static event EventHandler<UpdateEventCallbackArgs>?  ItemUpdated;
+    public static event EventHandler<int>?                      ItemRemoved;
 
     protected override void OnInitialized()
     {
@@ -33,7 +33,7 @@
         ItemManager.ItemAdded += ItemManagerOnItemAdded;
     }
 
-    private void ItemManagerOnItemAdded(object sender, EventArgs e)
+    private void ItemManagerOnItemAdded(object? sender, EventArgs e)
     {
         StateHasChanged();
     }
